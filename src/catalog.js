@@ -7,6 +7,17 @@ const fs = require('fs');
 const path = require('path');
 const { normalizeCatalog } = require('./normalize');
 
+// В Node 18+ fetch встроен; на старых системах (Windows Server 2012 R2 → Node 16)
+// используем пакет node-fetch. Динамический import, т.к. node-fetch v3 — ESM-only.
+const fetchFn = (typeof fetch === 'function')
+  ? fetch
+  : ((...args) => import('node-fetch').then(({ default: f }) => f(...args)));
+
+// AbortSignal.timeout есть с Node 16.14, но подстрахуемся на случай ещё более старых
+const abortTimeout = (ms) => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout
+  ? AbortSignal.timeout(ms)
+  : undefined);
+
 const API_BASE = 'https://cloud-api.yandex.net/v1/disk';
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const SNAPSHOT = path.join(DATA_DIR, 'catalog-cache.json');
@@ -39,9 +50,9 @@ async function download() {
   if (!token) throw new Error('YANDEX_OAUTH_TOKEN не задан (.env)');
 
   // Шаг 1: получить временную ссылку на скачивание
-  const meta = await fetch(
+  const meta = await fetchFn(
     `${API_BASE}/resources/download?path=${encodeURIComponent(diskPath)}`,
-    { headers: { Authorization: `OAuth ${token}` }, signal: AbortSignal.timeout(15000) },
+    { headers: { Authorization: `OAuth ${token}` }, signal: abortTimeout(15000) },
   );
   if (!meta.ok) {
     throw new Error(`Яндекс API ${meta.status}: ${(await meta.text()).slice(0, 300)}`);
@@ -49,7 +60,7 @@ async function download() {
   const { href } = await meta.json();
 
   // Шаг 2: скачать файл
-  const file = await fetch(href, { signal: AbortSignal.timeout(30000) });
+  const file = await fetchFn(href, { signal: abortTimeout(30000) });
   if (!file.ok) throw new Error(`Скачивание файла с Диска: HTTP ${file.status}`);
   const raw = await file.json();
 
