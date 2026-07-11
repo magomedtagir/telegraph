@@ -1,0 +1,15 @@
+services:
+  phone-bot:
+    build: .
+    container_name: phone-bot
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      # data наружу: hidden_imei.txt можно править без пересборки,
+      # а кэш каталога переживает пересоздание контейнера
+      - ./data:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"

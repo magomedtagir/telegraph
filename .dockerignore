@@ -1,0 +1,9 @@
+node_modules
+.env
+.git
+.gitignore
+data/catalog-cache.json
+*.log
+1c
+scripts
+README.md
